@@ -7,7 +7,10 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test:telegram": "node -e \"import('./src/report/telegram.js').then(m => m.send('🧪 test ping desde Research-X-Github'))\""
+    "test:telegram": "node -e \"import('./src/report/telegram.js').then(m => m.send('🧪 test ping desde Research-X-Github'))\"",
+    "dashboard": "npm run --prefix dashboard dev",
+    "dashboard:build": "npm run --prefix dashboard build",
+    "dashboard:start": "npm run --prefix dashboard start -- -p 3001"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.0",

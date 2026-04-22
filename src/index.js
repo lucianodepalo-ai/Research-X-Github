@@ -55,7 +55,7 @@ async function main() {
 
   if (topN.length > 0) {
     await sendReport(topN);
-    for (const r of topN) markReported(r.id, r.score);
+    for (const r of topN) markReported(r.id, r);
   } else {
     await sendReport([]);
   }

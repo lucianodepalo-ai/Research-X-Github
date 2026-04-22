@@ -1,0 +1,215 @@
+import { getDb } from "./db";
+import type {
+  Repo,
+  RepoFilters,
+  Stats,
+  ActivityPoint,
+  ReportDay,
+} from "./types";
+
+export function getStats(): Stats {
+  const db = getDb();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const total = (db.prepare("SELECT COUNT(*) as c FROM seen_repos").get() as { c: number }).c;
+  const reported = (db.prepare("SELECT COUNT(*) as c FROM seen_repos WHERE reported_at IS NOT NULL").get() as { c: number }).c;
+  const bookmarkedCount = (db.prepare("SELECT COUNT(*) as c FROM seen_repos WHERE bookmarked = 1").get() as { c: number }).c;
+  const todayCount = (db.prepare("SELECT COUNT(*) as c FROM seen_repos WHERE DATE(first_seen_at) = ?").get(today) as { c: number }).c;
+
+  const avgRow = db.prepare("SELECT AVG(score) as a FROM seen_repos WHERE score IS NOT NULL").get() as { a: number | null };
+  const langRow = db
+    .prepare(
+      `SELECT language, COUNT(*) as c FROM seen_repos
+       WHERE language IS NOT NULL AND language != ''
+       GROUP BY language ORDER BY c DESC LIMIT 1`
+    )
+    .get() as { language: string; c: number } | undefined;
+
+  return {
+    total,
+    reported,
+    avgScore: avgRow.a ? Math.round(avgRow.a * 10) / 10 : null,
+    topLanguage: langRow?.language ?? null,
+    todayCount,
+    bookmarkedCount,
+  };
+}
+
+export function getActivityData(days = 30): ActivityPoint[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT DATE(first_seen_at) as date, COUNT(*) as count
+       FROM seen_repos
+       WHERE DATE(first_seen_at) >= DATE('now', ?)
+       GROUP BY DATE(first_seen_at)
+       ORDER BY date ASC`
+    )
+    .all(`-${days} days`) as ActivityPoint[];
+  return rows;
+}
+
+export function getRecentReports(limit = 7): ReportDay[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT DATE(reported_at) as date, COUNT(*) as count, MAX(score) as topScore
+       FROM seen_repos
+       WHERE reported_at IS NOT NULL
+       GROUP BY DATE(reported_at)
+       ORDER BY date DESC
+       LIMIT ?`
+    )
+    .all(limit) as ReportDay[];
+  return rows;
+}
+
+export function getLanguages(): string[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT DISTINCT language FROM seen_repos
+       WHERE language IS NOT NULL AND language != ''
+       ORDER BY language ASC`
+    )
+    .all() as { language: string }[];
+  return rows.map((r) => r.language);
+}
+
+export function getRepos(
+  filters: RepoFilters = {}
+): { repos: Repo[]; total: number } {
+  const db = getDb();
+  const {
+    search,
+    scoreMin,
+    scoreMax,
+    language,
+    source,
+    status,
+    sortBy = "first_seen_at",
+    sortDir = "desc",
+    page = 1,
+    pageSize = 24,
+  } = filters;
+
+  const conditions: string[] = [];
+  const params: (string | number)[] = [];
+
+  if (search) {
+    conditions.push(
+      `id IN (SELECT rowid FROM repos_fts WHERE repos_fts MATCH ?)`
+    );
+    params.push(`${search}*`);
+  }
+  if (scoreMin !== undefined) {
+    conditions.push("score >= ?");
+    params.push(scoreMin);
+  }
+  if (scoreMax !== undefined) {
+    conditions.push("score <= ?");
+    params.push(scoreMax);
+  }
+  if (language) {
+    conditions.push("language = ?");
+    params.push(language);
+  }
+  if (source) {
+    conditions.push("source = ?");
+    params.push(source);
+  }
+  if (status === "reported") {
+    conditions.push("reported_at IS NOT NULL");
+  } else if (status === "unreported") {
+    conditions.push("reported_at IS NULL");
+  } else if (status === "bookmarked") {
+    conditions.push("bookmarked = 1");
+  } else if (status === "manual") {
+    conditions.push("added_manually = 1");
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const safeSortBy = ["score", "stars", "first_seen_at", "reported_at"].includes(sortBy)
+    ? sortBy
+    : "first_seen_at";
+  const safeSortDir = sortDir === "asc" ? "ASC" : "DESC";
+
+  const total = (
+    db.prepare(`SELECT COUNT(*) as c FROM seen_repos ${where}`).get(...params) as { c: number }
+  ).c;
+
+  const offset = (page - 1) * pageSize;
+  const repos = db
+    .prepare(
+      `SELECT * FROM seen_repos ${where}
+       ORDER BY ${safeSortBy} ${safeSortDir} NULLS LAST
+       LIMIT ? OFFSET ?`
+    )
+    .all(...params, pageSize, offset) as Repo[];
+
+  return { repos, total };
+}
+
+export function getRepo(id: number): Repo | null {
+  const db = getDb();
+  return (db.prepare("SELECT * FROM seen_repos WHERE id = ?").get(id) as Repo | undefined) ?? null;
+}
+
+export function getReportDays(): ReportDay[] {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT DATE(reported_at) as date, COUNT(*) as count, MAX(score) as topScore
+       FROM seen_repos
+       WHERE reported_at IS NOT NULL
+       GROUP BY DATE(reported_at)
+       ORDER BY date DESC`
+    )
+    .all() as ReportDay[];
+}
+
+export function getReposByReportDate(date: string): Repo[] {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT * FROM seen_repos
+       WHERE DATE(reported_at) = ?
+       ORDER BY score DESC NULLS LAST`
+    )
+    .all(date) as Repo[];
+}
+
+export function toggleBookmark(id: number, value: 0 | 1): void {
+  const db = getDb();
+  db.prepare("UPDATE seen_repos SET bookmarked = ? WHERE id = ?").run(value, id);
+}
+
+export function insertManualRepo(data: {
+  id: number;
+  full_name: string;
+  html_url: string;
+  description: string | null;
+  stars: number;
+  language: string | null;
+}): void {
+  const db = getDb();
+  db.prepare(
+    `INSERT OR IGNORE INTO seen_repos
+     (id, full_name, first_seen_at, html_url, description, stars, language, source, added_manually)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'manual', 1)`
+  ).run(
+    data.id,
+    data.full_name,
+    new Date().toISOString(),
+    data.html_url,
+    data.description,
+    data.stars,
+    data.language
+  );
+}
+
+export function getAllRepos(): Repo[] {
+  const db = getDb();
+  return db.prepare("SELECT * FROM seen_repos ORDER BY first_seen_at DESC").all() as Repo[];
+}

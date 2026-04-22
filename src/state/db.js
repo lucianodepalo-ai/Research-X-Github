@@ -19,6 +19,45 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_seen_repos_reported ON seen_repos(reported_at);
 `);
 
+// Add new columns safely (older SQLite lacks ADD COLUMN IF NOT EXISTS)
+const existingCols = new Set(
+  db.prepare('PRAGMA table_info(seen_repos)').all().map((c) => c.name),
+);
+const newCols = [
+  'html_url TEXT',
+  'description TEXT',
+  'stars INTEGER',
+  'language TEXT',
+  'source TEXT',
+  'summary TEXT',
+  'use_case TEXT',
+  'bookmarked INTEGER DEFAULT 0',
+  'added_manually INTEGER DEFAULT 0',
+];
+for (const col of newCols) {
+  const name = col.split(' ')[0];
+  if (!existingCols.has(name)) {
+    db.exec(`ALTER TABLE seen_repos ADD COLUMN ${col}`);
+  }
+}
+
+db.exec(`
+  CREATE VIRTUAL TABLE IF NOT EXISTS repos_fts USING fts5(
+    full_name, description, summary, use_case,
+    content=seen_repos, content_rowid=id
+  );
+  CREATE TRIGGER IF NOT EXISTS repos_fts_insert AFTER INSERT ON seen_repos BEGIN
+    INSERT INTO repos_fts(rowid, full_name, description, summary, use_case)
+    VALUES (new.id, new.full_name, new.description, new.summary, new.use_case);
+  END;
+  CREATE TRIGGER IF NOT EXISTS repos_fts_update AFTER UPDATE ON seen_repos BEGIN
+    INSERT INTO repos_fts(repos_fts, rowid, full_name, description, summary, use_case)
+    VALUES ('delete', old.id, old.full_name, old.description, old.summary, old.use_case);
+    INSERT INTO repos_fts(rowid, full_name, description, summary, use_case)
+    VALUES (new.id, new.full_name, new.description, new.summary, new.use_case);
+  END;
+`);
+
 const stmtIsReported = db.prepare(
   'SELECT 1 FROM seen_repos WHERE id = ? AND reported_at IS NOT NULL',
 );
@@ -27,9 +66,13 @@ const stmtUpsertSeen = db.prepare(`
   VALUES (?, ?, ?)
   ON CONFLICT(id) DO NOTHING
 `);
-const stmtMarkReported = db.prepare(
-  'UPDATE seen_repos SET reported_at = ?, score = ? WHERE id = ?',
-);
+const stmtMarkReported = db.prepare(`
+  UPDATE seen_repos SET
+    reported_at = ?, score = ?,
+    html_url = ?, description = ?, stars = ?,
+    language = ?, source = ?, summary = ?, use_case = ?
+  WHERE id = ?
+`);
 
 export function isReported(repoId) {
   return !!stmtIsReported.get(repoId);
@@ -39,8 +82,13 @@ export function markSeen(repo) {
   stmtUpsertSeen.run(repo.id, repo.full_name, new Date().toISOString());
 }
 
-export function markReported(repoId, score) {
-  stmtMarkReported.run(new Date().toISOString(), score, repoId);
+export function markReported(repoId, repo) {
+  stmtMarkReported.run(
+    new Date().toISOString(), repo.score,
+    repo.html_url ?? null, repo.description ?? null, repo.stars ?? null,
+    repo.language ?? null, repo.source ?? null, repo.summary ?? null, repo.use_case ?? null,
+    repoId,
+  );
 }
 
 // IDs of repos reported more than `days` ago — eligible for re-report as fallback
