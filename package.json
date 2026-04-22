@@ -1,0 +1,22 @@
+{
+  "name": "research-x-github",
+  "version": "0.1.0",
+  "description": "Bot diario que investiga repos GitHub relevantes para Claude/Claude Code y reporta por Telegram",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test:telegram": "node -e \"import('./src/report/telegram.js').then(m => m.send('🧪 test ping desde Research-X-Github'))\""
+  },
+  "dependencies": {
+    "@octokit/rest": "^21.0.0",
+    "better-sqlite3": "^11.5.0",
+    "cheerio": "^1.0.0",
+    "dotenv": "^16.4.5",
+    "undici": "^6.20.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
