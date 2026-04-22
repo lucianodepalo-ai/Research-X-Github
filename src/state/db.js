@@ -43,4 +43,13 @@ export function markReported(repoId, score) {
   stmtMarkReported.run(new Date().toISOString(), score, repoId);
 }
 
+// IDs of repos reported more than `days` ago — eligible for re-report as fallback
+export function getStaleReportedIds(days = 30) {
+  const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
+  const rows = db
+    .prepare('SELECT id FROM seen_repos WHERE reported_at IS NOT NULL AND reported_at < ?')
+    .all(cutoff);
+  return new Set(rows.map((r) => r.id));
+}
+
 export { db };

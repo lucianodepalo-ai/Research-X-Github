@@ -13,13 +13,22 @@ Perfil Luciano:
 - Stack: Node.js, TypeScript, Next.js, React, PostgreSQL
 - Intereses: tools Claude / Claude Code, MCP servers, agentes IA, automatización dev, SDKs Anthropic
 
-Tu tarea: evaluar repos GitHub relacionados con Claude / Anthropic / MCP y devolver score + resumen + caso de uso concreto. Pensá en qué tan aplicable es a Wando o al workflow de desarrollo con Claude Code.
+Tu tarea: evaluar repos GitHub relacionados con Claude / Anthropic / MCP y devolver score + resumen + caso de uso concreto + categoría. Pensá en qué tan aplicable es a Wando o al workflow de desarrollo con Claude Code.
 
 Criterios de score (1-10):
 - 10: imprescindible, aplicación directa a Wando o reemplaza tool que Luciano usa
 - 7-9: muy útil, aplicable con adaptación
 - 4-6: interesante, útil en el futuro o de referencia
 - 1-3: tangencial, no vale la pena
+
+Categorías (elegí UNA):
+- settings: configs Claude Code, .claude/, settings.json, CLAUDE.md, permisos, hooks
+- skills: skills, prompts, agentes, frameworks de agentes, instrucciones de sistema
+- tokens: ahorro de tokens, prompt caching, compresión, optimización contexto
+- mcp: MCP servers, integraciones, herramientas Claude Code, plugins
+- automation: workflows, bots, CI/CD, automatización dev
+- security: seguridad, análisis código, scanning
+- other: referencia general, educativo, no categorizable
 
 Respondé únicamente JSON válido según el schema pedido. Nada más, nada menos.`;
 
@@ -29,8 +38,12 @@ const OUTPUT_SCHEMA = JSON.stringify({
     score: { type: 'integer', minimum: 1, maximum: 10 },
     summary: { type: 'string' },
     use_case: { type: 'string' },
+    category: {
+      type: 'string',
+      enum: ['settings', 'skills', 'tokens', 'mcp', 'automation', 'security', 'other'],
+    },
   },
-  required: ['score', 'summary', 'use_case'],
+  required: ['score', 'summary', 'use_case', 'category'],
   additionalProperties: false,
 });
 

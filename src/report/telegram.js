@@ -8,11 +8,31 @@ function escape(s) {
   return String(s).replace(MD_SPECIAL, '\\$1');
 }
 
+const CATEGORY_EMOJI = {
+  settings:   '⚙️  Settings',
+  skills:     '🧠 Skills',
+  tokens:     '💰 Tokens',
+  mcp:        '🔌 MCP',
+  automation: '🤖 Automation',
+  security:   '🔐 Security',
+  other:      '📦 Other',
+};
+
+const SOURCE_LABEL = {
+  search:   '📡 GitHub Search',
+  trending: '📈 GitHub Trending',
+  awesome:  '📚 Awesome Lists',
+};
+
 function formatRepo(repo, idx) {
   const stars = repo.stars != null ? `⭐${repo.stars}` : '';
   const score = `*${repo.score}/10*`;
-  const header = `*${idx}\\. [${escape(repo.full_name)}](${repo.html_url})*  ·  ${stars}  ·  ${score}`;
+  const cat = CATEGORY_EMOJI[repo.category] || CATEGORY_EMOJI.other;
+  const src = SOURCE_LABEL[repo.source] || '🔗 GitHub';
+  const header = `*${idx}\\. [${escape(repo.full_name)}](${repo.html_url})*  ·  ${stars}  ·  ${score}  ·  ${escape(cat)}`;
+  const meta = `[${escape(repo.html_url)}](${repo.html_url})  ·  ${escape(src)}`;
   return `${header}
+${meta}
 ${escape(repo.summary)}
 💡 ${escape(repo.use_case)}`;
 }
