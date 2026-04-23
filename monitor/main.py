@@ -27,6 +27,8 @@ from monitor.notify.telegram import send_monitor_started
 from monitor.sources.anthropic import check_anthropic_blog
 from monitor.sources.twitter import discover_accounts, monitor_accounts
 from monitor.sources.twitter_rss import check_twitter_rss
+from monitor.sources.hackernews import check_hackernews
+from monitor.sources.devto import check_devto
 
 logging.basicConfig(
     level=logging.INFO,
@@ -37,10 +39,38 @@ logger = logging.getLogger("research-x-monitor")
 
 # Intervalos en segundos
 TWITTER_MONITOR_INTERVAL = 45 * 60        # 45 minutos
-TWITTER_RSS_INTERVAL = 6 * 60 * 60        # 6 horas (límite free tier rss.app/fetchrss)
+TWITTER_RSS_INTERVAL = 6 * 60 * 60        # 6 horas
 TWITTER_DISCOVERY_INTERVAL = 30 * 60      # 30 minutos
 ANTHROPIC_BLOG_INTERVAL = 2 * 60 * 60     # 2 horas
+HACKERNEWS_INTERVAL = 2 * 60 * 60         # 2 horas
+DEVTO_INTERVAL = 3 * 60 * 60              # 3 horas
 DISCOVERY_JITTER = 3 * 60                 # ±3 minutos de jitter
+
+
+async def hackernews_loop() -> None:
+    """Loop de Hacker News vía Algolia + top stories. Corre cada 2 horas."""
+    logger.info("Hacker News loop iniciado")
+    await asyncio.sleep(10 * 60)  # Delay inicial de 10 min para no saturar al arrancar
+    while True:
+        try:
+            count = await check_hackernews()
+            logger.info("HN: %d posts nuevos", count)
+        except Exception as e:
+            logger.error("Error en hackernews_loop: %s", e, exc_info=True)
+        await asyncio.sleep(HACKERNEWS_INTERVAL)
+
+
+async def devto_loop() -> None:
+    """Loop de Dev.to RSS. Corre cada 3 horas."""
+    logger.info("Dev.to loop iniciado")
+    await asyncio.sleep(20 * 60)  # Delay inicial de 20 min
+    while True:
+        try:
+            count = await check_devto()
+            logger.info("Dev.to: %d artículos nuevos", count)
+        except Exception as e:
+            logger.error("Error en devto_loop: %s", e, exc_info=True)
+        await asyncio.sleep(DEVTO_INTERVAL)
 
 
 async def twitter_monitor_loop() -> None:
@@ -112,6 +142,8 @@ async def main() -> None:
         twitter_rss_loop(),
         twitter_discovery_loop(),
         anthropic_blog_loop(),
+        hackernews_loop(),
+        devto_loop(),
     )
 
 
