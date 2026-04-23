@@ -43,6 +43,15 @@ for (const col of newCols) {
 }
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS monitor_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source TEXT NOT NULL,
+    level TEXT DEFAULT 'info',
+    message TEXT NOT NULL,
+    detail TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_events_created ON monitor_events(created_at DESC);
   CREATE TABLE IF NOT EXISTS twitter_content (
     id           TEXT PRIMARY KEY,
     account      TEXT NOT NULL,

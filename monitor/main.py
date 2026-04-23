@@ -29,6 +29,7 @@ from monitor.sources.twitter import discover_accounts, monitor_accounts
 from monitor.sources.twitter_rss import check_twitter_rss
 from monitor.sources.hackernews import check_hackernews
 from monitor.sources.devto import check_devto
+from monitor.sources.github_live import check_github_live
 
 logging.basicConfig(
     level=logging.INFO,
@@ -44,7 +45,26 @@ TWITTER_DISCOVERY_INTERVAL = 30 * 60      # 30 minutos
 ANTHROPIC_BLOG_INTERVAL = 2 * 60 * 60     # 2 horas
 HACKERNEWS_INTERVAL = 2 * 60 * 60         # 2 horas
 DEVTO_INTERVAL = 3 * 60 * 60              # 3 horas
+GITHUB_LIVE_INTERVAL = 2 * 60 * 60        # 2 horas (Tier 1 sin análisis)
 DISCOVERY_JITTER = 3 * 60                 # ±3 minutos de jitter
+
+
+async def github_live_loop() -> None:
+    """GitHub live discovery — Tier 1 queries cada 2 horas. Sin análisis Claude."""
+    logger.info("GitHub live loop iniciado")
+    # Primera corrida inmediata al arrancar
+    try:
+        count = await check_github_live()
+        logger.info("GitHub live: %d repos nuevos (primera corrida)", count)
+    except Exception as e:
+        logger.error("Error en github_live primera corrida: %s", e)
+    while True:
+        await asyncio.sleep(GITHUB_LIVE_INTERVAL)
+        try:
+            count = await check_github_live()
+            logger.info("GitHub live: %d repos nuevos", count)
+        except Exception as e:
+            logger.error("Error en github_live_loop: %s", e, exc_info=True)
 
 
 async def hackernews_loop() -> None:
@@ -138,6 +158,7 @@ async def main() -> None:
 
     # Correr todos los loops en paralelo
     await asyncio.gather(
+        github_live_loop(),
         twitter_monitor_loop(),
         twitter_rss_loop(),
         twitter_discovery_loop(),

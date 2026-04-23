@@ -308,6 +308,72 @@ export function getBlogPosts(
   return { posts, total };
 }
 
+// ── Monitor events (live view) ────────────────────────────────────────────────
+
+export interface MonitorEvent {
+  id: number;
+  source: string;
+  level: string;
+  message: string;
+  detail: string | null;
+  created_at: string;
+}
+
+export interface LiveStats {
+  reposToday: number;
+  reposTotal: number;
+  blogsToday: number;
+  twitterToday: number;
+  lastGithubLive: string | null;
+  lastAnthropic: string | null;
+  lastHN: string | null;
+  lastDevto: string | null;
+}
+
+export function getRecentEvents(limit = 80): MonitorEvent[] {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT * FROM monitor_events ORDER BY id DESC LIMIT ?`
+    )
+    .all(limit) as MonitorEvent[];
+}
+
+export function getLiveStats(): LiveStats {
+  const db = getDb();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const reposToday = (db.prepare(
+    "SELECT COUNT(*) as c FROM seen_repos WHERE DATE(first_seen_at) = ?"
+  ).get(today) as { c: number }).c;
+
+  const reposTotal = (db.prepare("SELECT COUNT(*) as c FROM seen_repos").get() as { c: number }).c;
+
+  const blogsToday = (db.prepare(
+    "SELECT COUNT(*) as c FROM blog_posts WHERE DATE(published_at) = ?"
+  ).get(today) as { c: number }).c;
+
+  const twitterToday = (db.prepare(
+    "SELECT COUNT(*) as c FROM twitter_content WHERE DATE(published_at) = ?"
+  ).get(today) as { c: number }).c;
+
+  const lastEvent = (source: string) =>
+    (db.prepare(
+      "SELECT created_at FROM monitor_events WHERE source = ? ORDER BY id DESC LIMIT 1"
+    ).get(source) as { created_at: string } | undefined)?.created_at ?? null;
+
+  return {
+    reposToday,
+    reposTotal,
+    blogsToday,
+    twitterToday,
+    lastGithubLive: lastEvent("github_live"),
+    lastAnthropic: lastEvent("anthropic"),
+    lastHN: lastEvent("hackernews"),
+    lastDevto: lastEvent("devto"),
+  };
+}
+
 export function getLatestBlogPost(): BlogPost | null {
   const db = getDb();
   return (

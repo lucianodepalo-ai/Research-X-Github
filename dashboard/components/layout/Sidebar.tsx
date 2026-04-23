@@ -2,15 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart2, BookOpen, BookmarkIcon, History, PlusCircle, MessageSquare, Newspaper } from "lucide-react";
+import { BarChart2, BookOpen, BookmarkIcon, History, PlusCircle, MessageSquare, Newspaper, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: BarChart2 },
+  { href: "/live", label: "Monitor Live", icon: Radio },
   { href: "/repos", label: "Repos GitHub", icon: BookOpen },
   { href: "/twitter", label: "Twitter / X", icon: MessageSquare },
-  { href: "/blog", label: "Blog Anthropic", icon: Newspaper },
-  { href: "/reports", label: "Reportes", icon: History },
+  { href: "/blog", label: "Blog / HN / Dev", icon: Newspaper },
+  { href: "/reports", label: "Reportes GitHub", icon: History },
   { href: "/repos?status=bookmarked", label: "Favoritos", icon: BookmarkIcon },
   { href: "/repos/new", label: "Agregar repo", icon: PlusCircle },
 ];

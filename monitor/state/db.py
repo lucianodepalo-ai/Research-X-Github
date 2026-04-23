@@ -114,6 +114,21 @@ def blog_post_exists(post_id: str) -> bool:
     return row is not None
 
 
+def log_event(source: str, message: str, level: str = "info", detail: str = "") -> None:
+    """Registra un evento del monitor para el dashboard en tiempo real."""
+    conn().execute(
+        """INSERT INTO monitor_events (source, level, message, detail, created_at)
+           VALUES (?, ?, ?, ?, ?)""",
+        (source, level, message, detail or None, now_iso()),
+    )
+    conn().commit()
+    # Mantener solo los últimos 500 eventos para no crecer indefinidamente
+    conn().execute(
+        "DELETE FROM monitor_events WHERE id NOT IN (SELECT id FROM monitor_events ORDER BY id DESC LIMIT 500)"
+    )
+    conn().commit()
+
+
 def save_blog_post(
     post_id: str,
     title: str,
