@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from monitor.notify.telegram import send_monitor_started
 from monitor.sources.anthropic import check_anthropic_blog
 from monitor.sources.twitter import discover_accounts, monitor_accounts
+from monitor.sources.twitter_rss import check_twitter_rss
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,6 +37,7 @@ logger = logging.getLogger("research-x-monitor")
 
 # Intervalos en segundos
 TWITTER_MONITOR_INTERVAL = 45 * 60        # 45 minutos
+TWITTER_RSS_INTERVAL = 6 * 60 * 60        # 6 horas (límite free tier rss.app/fetchrss)
 TWITTER_DISCOVERY_INTERVAL = 30 * 60      # 30 minutos
 ANTHROPIC_BLOG_INTERVAL = 2 * 60 * 60     # 2 horas
 DISCOVERY_JITTER = 3 * 60                 # ±3 minutos de jitter
@@ -51,6 +53,18 @@ async def twitter_monitor_loop() -> None:
         except Exception as e:
             logger.error("Error en twitter_monitor_loop: %s", e, exc_info=True)
         await asyncio.sleep(TWITTER_MONITOR_INTERVAL)
+
+
+async def twitter_rss_loop() -> None:
+    """Loop de Twitter vía RSS (rss.app + FetchRSS). Corre cada 6 horas."""
+    logger.info("Twitter RSS loop iniciado")
+    while True:
+        try:
+            count = await check_twitter_rss()
+            logger.info("Twitter RSS: %d tweets procesados", count)
+        except Exception as e:
+            logger.error("Error en twitter_rss_loop: %s", e, exc_info=True)
+        await asyncio.sleep(TWITTER_RSS_INTERVAL)
 
 
 async def twitter_discovery_loop() -> None:
@@ -95,6 +109,7 @@ async def main() -> None:
     # Correr todos los loops en paralelo
     await asyncio.gather(
         twitter_monitor_loop(),
+        twitter_rss_loop(),
         twitter_discovery_loop(),
         anthropic_blog_loop(),
     )

@@ -5,10 +5,19 @@ import { config } from '../config.js';
 const octokit = new Octokit({ auth: config.githubToken });
 
 const AWESOME_LISTS = [
+  // Claude / Claude Code específicos
   'hesreallyhim/awesome-claude-code',
   'yzfly/Awesome-Claude-Prompts',
+  // MCP
   'modelcontextprotocol/servers',
   'punkpeye/awesome-mcp-servers',
+  // Anthropic oficial
+  'anthropics/anthropic-cookbook',
+  // Agentes IA
+  'e2b-dev/awesome-ai-agents',
+  'slavakurilyak/awesome-ai-agents',
+  // LLMs general (filtrados luego por score)
+  'Shubhamsaboo/awesome-llm-apps',
 ];
 
 const GITHUB_LINK_RE = /https?:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?:[/#)\s]|$)/g;
@@ -66,8 +75,8 @@ export async function fetchAwesomeRepos() {
     const md = await fetchRawReadme(list);
     extractRepos(md, list).forEach((n) => all.add(n));
   }
-  // Cap to avoid GitHub API exhaustion on first run
-  const limited = [...all].slice(0, 50);
+  // Cap ampliado: más listas = más repos curados
+  const limited = [...all].slice(0, 80);
   const hydrated = await Promise.all(limited.map(hydrate));
   return hydrated.filter(Boolean);
 }

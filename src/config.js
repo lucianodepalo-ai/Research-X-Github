@@ -17,8 +17,8 @@ function read() {
     telegramToken: process.env.TELEGRAM_BOT_TOKEN,
     telegramChatId: process.env.TELEGRAM_CHAT_ID,
     model: process.env.MODEL || 'opus',
-    maxReposAnalyzed: parseInt(process.env.MAX_REPOS_ANALYZED || '30', 10),
-    topN: parseInt(process.env.TOP_N || '5', 10),
+    maxReposAnalyzed: parseInt(process.env.MAX_REPOS_ANALYZED || '50', 10),
+    topN: parseInt(process.env.TOP_N || '10', 10),
   };
 }
 
