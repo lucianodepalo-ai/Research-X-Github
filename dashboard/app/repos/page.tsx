@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { getRepos, getLanguages, getStats } from "@/lib/queries";
+import { getRepos, getLanguages, getStats, getCategories } from "@/lib/queries";
 import type { RepoFilters } from "@/lib/types";
 import { RepoFilters as RepoFiltersComponent } from "@/components/repos/RepoFilters";
 import { RepoGrid } from "@/components/repos/RepoGrid";
@@ -7,7 +7,6 @@ import { Pagination } from "@/components/shared/Pagination";
 import { ExportButton } from "@/components/shared/ExportButton";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
 
 interface PageProps {
@@ -30,6 +29,7 @@ export default async function ReposPage({ searchParams }: PageProps) {
     search: str(sp.search),
     language: str(sp.language),
     source: str(sp.source),
+    category: str(sp.category),
     status: (str(sp.status) as RepoFilters["status"]) ?? "all",
     sortBy: (str(sp.sortBy) as RepoFilters["sortBy"]) ?? "first_seen_at",
     sortDir: (str(sp.sortDir) as RepoFilters["sortDir"]) ?? "desc",
@@ -39,6 +39,7 @@ export default async function ReposPage({ searchParams }: PageProps) {
 
   const { repos, total } = getRepos(filters);
   const languages = getLanguages();
+  const categories = getCategories();
   const stats = getStats();
 
   return (
@@ -65,6 +66,7 @@ export default async function ReposPage({ searchParams }: PageProps) {
       <Suspense fallback={<Skeleton className="h-10 w-full" />}>
         <RepoFiltersComponent
           languages={languages}
+          categories={categories}
           totalCount={stats.total}
           filteredCount={total}
         />

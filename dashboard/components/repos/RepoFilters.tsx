@@ -15,11 +15,12 @@ import { Button } from "@/components/ui/button";
 
 interface RepoFiltersProps {
   languages: string[];
+  categories: string[];
   totalCount: number;
   filteredCount: number;
 }
 
-export function RepoFilters({ languages, totalCount, filteredCount }: RepoFiltersProps) {
+export function RepoFilters({ languages, categories, totalCount, filteredCount }: RepoFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -73,6 +74,27 @@ export function RepoFilters({ languages, totalCount, filteredCount }: RepoFilter
             ))}
           </SelectContent>
         </Select>
+
+        {categories.length > 0 && (
+          <Select
+            defaultValue={searchParams.get("category") ?? "all"}
+            onValueChange={(v) => updateParam("category", v)}
+          >
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Categoría" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Categorías</SelectItem>
+              <SelectItem value="mcp">MCP</SelectItem>
+              <SelectItem value="automation">Automation</SelectItem>
+              <SelectItem value="skills">Skills</SelectItem>
+              <SelectItem value="settings">Settings</SelectItem>
+              <SelectItem value="tokens">Tokens</SelectItem>
+              <SelectItem value="security">Security</SelectItem>
+              <SelectItem value="other">Other</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
 
         <Select
           defaultValue={searchParams.get("source") ?? "all"}

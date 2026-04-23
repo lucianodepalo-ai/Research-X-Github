@@ -4,3 +4,8 @@ data/
 *.log
 .DS_Store
 .claude/
+monitor/.env
+monitor/.twitter_session.json
+__pycache__/
+*.pyc
+.venv/

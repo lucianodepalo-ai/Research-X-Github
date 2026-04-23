@@ -5,6 +5,9 @@ import type {
   Stats,
   ActivityPoint,
   ReportDay,
+  TwitterContent,
+  BlogPost,
+  TrackedAccount,
 } from "./types";
 
 export function getStats(): Stats {
@@ -86,6 +89,7 @@ export function getRepos(
     scoreMax,
     language,
     source,
+    category,
     status,
     sortBy = "first_seen_at",
     sortDir = "desc",
@@ -117,6 +121,10 @@ export function getRepos(
   if (source) {
     conditions.push("source = ?");
     params.push(source);
+  }
+  if (category && category !== "all") {
+    conditions.push("category = ?");
+    params.push(category);
   }
   if (status === "reported") {
     conditions.push("reported_at IS NOT NULL");
@@ -212,4 +220,97 @@ export function insertManualRepo(data: {
 export function getAllRepos(): Repo[] {
   const db = getDb();
   return db.prepare("SELECT * FROM seen_repos ORDER BY first_seen_at DESC").all() as Repo[];
+}
+
+export function getCategories(): string[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT DISTINCT category FROM seen_repos
+       WHERE category IS NOT NULL AND category != ''
+       ORDER BY category ASC`
+    )
+    .all() as { category: string }[];
+  return rows.map((r) => r.category);
+}
+
+// ── Twitter ───────────────────────────────────────────────────────────────────
+
+export function getTwitterFeed(
+  filters: { account?: string; scoreMin?: number; page?: number; pageSize?: number } = {}
+): { items: TwitterContent[]; total: number } {
+  const db = getDb();
+  const { account, scoreMin = 5, page = 1, pageSize = 30 } = filters;
+
+  const conditions = ["score >= ?"];
+  const params: (string | number)[] = [scoreMin];
+
+  if (account) {
+    conditions.push("account = ?");
+    params.push(account);
+  }
+
+  const where = `WHERE ${conditions.join(" AND ")}`;
+  const total = (
+    db.prepare(`SELECT COUNT(*) as c FROM twitter_content ${where}`).get(...params) as { c: number }
+  ).c;
+
+  const offset = (page - 1) * pageSize;
+  const items = db
+    .prepare(
+      `SELECT * FROM twitter_content ${where}
+       ORDER BY published_at DESC
+       LIMIT ? OFFSET ?`
+    )
+    .all(...params, pageSize, offset) as TwitterContent[];
+
+  return { items, total };
+}
+
+export function getTrackedAccounts(): TrackedAccount[] {
+  const db = getDb();
+  return db
+    .prepare("SELECT * FROM tracked_accounts ORDER BY source, handle")
+    .all() as TrackedAccount[];
+}
+
+export function getTwitterStats(): { total: number; todayCount: number; accountCount: number } {
+  const db = getDb();
+  const today = new Date().toISOString().slice(0, 10);
+  const total = (db.prepare("SELECT COUNT(*) as c FROM twitter_content WHERE score >= 5").get() as { c: number }).c;
+  const todayCount = (
+    db.prepare("SELECT COUNT(*) as c FROM twitter_content WHERE DATE(published_at) = ?").get(today) as { c: number }
+  ).c;
+  const accountCount = (
+    db.prepare("SELECT COUNT(*) as c FROM tracked_accounts WHERE active = 1").get() as { c: number }
+  ).c;
+  return { total, todayCount, accountCount };
+}
+
+// ── Blog posts ────────────────────────────────────────────────────────────────
+
+export function getBlogPosts(
+  filters: { page?: number; pageSize?: number } = {}
+): { posts: BlogPost[]; total: number } {
+  const db = getDb();
+  const { page = 1, pageSize = 20 } = filters;
+
+  const total = (db.prepare("SELECT COUNT(*) as c FROM blog_posts").get() as { c: number }).c;
+  const offset = (page - 1) * pageSize;
+  const posts = db
+    .prepare(
+      `SELECT * FROM blog_posts
+       ORDER BY published_at DESC
+       LIMIT ? OFFSET ?`
+    )
+    .all(pageSize, offset) as BlogPost[];
+
+  return { posts, total };
+}
+
+export function getLatestBlogPost(): BlogPost | null {
+  const db = getDb();
+  return (
+    db.prepare("SELECT * FROM blog_posts ORDER BY published_at DESC LIMIT 1").get() as BlogPost | undefined
+  ) ?? null;
 }

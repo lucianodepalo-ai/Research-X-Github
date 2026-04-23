@@ -13,6 +13,37 @@ export interface Repo {
   use_case: string | null;
   bookmarked: number;
   added_manually: number;
+  category: string | null;
+}
+
+export interface TwitterContent {
+  id: string;
+  account: string;
+  content: string;
+  url: string | null;
+  published_at: string | null;
+  score: number | null;
+  summary: string | null;
+  notified_at: string | null;
+  source: string;
+}
+
+export interface BlogPost {
+  id: string;
+  source: string;
+  title: string | null;
+  url: string | null;
+  summary: string | null;
+  published_at: string | null;
+  notified_at: string | null;
+}
+
+export interface TrackedAccount {
+  handle: string;
+  added_at: string;
+  source: string;
+  active: number;
+  last_checked_at: string | null;
 }
 
 export interface RepoFilters {
@@ -21,6 +52,7 @@ export interface RepoFilters {
   scoreMax?: number;
   language?: string;
   source?: string;
+  category?: string;
   status?: "all" | "reported" | "unreported" | "bookmarked" | "manual";
   sortBy?: "score" | "stars" | "first_seen_at" | "reported_at";
   sortDir?: "asc" | "desc";

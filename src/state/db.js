@@ -33,6 +33,7 @@ const newCols = [
   'use_case TEXT',
   'bookmarked INTEGER DEFAULT 0',
   'added_manually INTEGER DEFAULT 0',
+  'category TEXT',
 ];
 for (const col of newCols) {
   const name = col.split(' ')[0];
@@ -40,6 +41,36 @@ for (const col of newCols) {
     db.exec(`ALTER TABLE seen_repos ADD COLUMN ${col}`);
   }
 }
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS twitter_content (
+    id           TEXT PRIMARY KEY,
+    account      TEXT NOT NULL,
+    content      TEXT NOT NULL,
+    url          TEXT,
+    published_at TEXT,
+    score        INTEGER,
+    summary      TEXT,
+    notified_at  TEXT,
+    source       TEXT DEFAULT 'monitored'
+  );
+  CREATE TABLE IF NOT EXISTS blog_posts (
+    id           TEXT PRIMARY KEY,
+    source       TEXT DEFAULT 'anthropic',
+    title        TEXT,
+    url          TEXT,
+    summary      TEXT,
+    published_at TEXT,
+    notified_at  TEXT
+  );
+  CREATE TABLE IF NOT EXISTS tracked_accounts (
+    handle          TEXT PRIMARY KEY,
+    added_at        TEXT,
+    source          TEXT DEFAULT 'manual',
+    active          INTEGER DEFAULT 1,
+    last_checked_at TEXT
+  );
+`);
 
 db.exec(`
   CREATE VIRTUAL TABLE IF NOT EXISTS repos_fts USING fts5(
@@ -70,7 +101,8 @@ const stmtMarkReported = db.prepare(`
   UPDATE seen_repos SET
     reported_at = ?, score = ?,
     html_url = ?, description = ?, stars = ?,
-    language = ?, source = ?, summary = ?, use_case = ?
+    language = ?, source = ?, summary = ?, use_case = ?,
+    category = ?
   WHERE id = ?
 `);
 
@@ -87,6 +119,7 @@ export function markReported(repoId, repo) {
     new Date().toISOString(), repo.score,
     repo.html_url ?? null, repo.description ?? null, repo.stars ?? null,
     repo.language ?? null, repo.source ?? null, repo.summary ?? null, repo.use_case ?? null,
+    repo.category ?? null,
     repoId,
   );
 }

@@ -2,15 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart2, BookOpen, BookmarkIcon, History, PlusCircle } from "lucide-react";
+import { BarChart2, BookOpen, BookmarkIcon, History, PlusCircle, MessageSquare, Newspaper } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: BarChart2 },
-  { href: "/repos", label: "Biblioteca", icon: BookOpen },
-  { href: "/repos/new", label: "Agregar repo", icon: PlusCircle },
+  { href: "/repos", label: "Repos GitHub", icon: BookOpen },
+  { href: "/twitter", label: "Twitter / X", icon: MessageSquare },
+  { href: "/blog", label: "Blog Anthropic", icon: Newspaper },
   { href: "/reports", label: "Reportes", icon: History },
   { href: "/repos?status=bookmarked", label: "Favoritos", icon: BookmarkIcon },
+  { href: "/repos/new", label: "Agregar repo", icon: PlusCircle },
 ];
 
 export function Sidebar() {

@@ -1,0 +1,35 @@
+module.exports = {
+  apps: [
+    {
+      name: 'research-x-monitor',
+      script: '/usr/bin/python3',
+      args: '-m monitor.main',
+      cwd: '/home/claude-user/Research-X-Github-1',
+      interpreter: 'none',
+      watch: false,
+      autorestart: true,
+      restart_delay: 10000,
+      max_restarts: 10,
+      env: {
+        PYTHONPATH: '/home/claude-user/Research-X-Github-1',
+        PYTHONUNBUFFERED: '1',
+      },
+      error_file: '/home/claude-user/.pm2/logs/research-x-monitor-error.log',
+      out_file: '/home/claude-user/.pm2/logs/research-x-monitor-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+    },
+    {
+      name: 'research-x-dashboard',
+      script: '/home/claude-user/Research-X-Github-1/dashboard/node_modules/.bin/next',
+      args: 'start -p 3001 -H 0.0.0.0',
+      cwd: '/home/claude-user/Research-X-Github-1/dashboard',
+      interpreter: '/usr/bin/node',
+      watch: false,
+      autorestart: true,
+      restart_delay: 5000,
+      error_file: '/home/claude-user/.pm2/logs/research-x-dashboard-error.log',
+      out_file: '/home/claude-user/.pm2/logs/research-x-dashboard-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+    },
+  ],
+};
