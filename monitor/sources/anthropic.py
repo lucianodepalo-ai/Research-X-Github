@@ -1,12 +1,13 @@
 """
 Fuente: Blog oficial de Anthropic.
-Fetch RSS cada 2 horas, guarda posts nuevos y los notifica.
+Scraping de anthropic.com/news cada 2 horas — sin RSS, sin API.
 """
 import hashlib
 import logging
+import re
 from datetime import datetime, timezone
 
-import feedparser
+import httpx
 
 from monitor.analyze.evaluator import summarize_blog_post
 from monitor.notify.telegram import send_blog_notification
@@ -14,65 +15,112 @@ from monitor.state.db import blog_post_exists, save_blog_post
 
 logger = logging.getLogger(__name__)
 
-RSS_URL = "https://www.anthropic.com/rss.xml"
-FALLBACK_URL = "https://www.anthropic.com/news"
+BASE_URL = "https://www.anthropic.com"
+NEWS_URL = f"{BASE_URL}/news"
+HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; ResearchBot/1.0)"}
 
 
-def _post_id(entry) -> str:
-    """ID estable: usa el GUID del RSS, o un hash de la URL."""
-    if hasattr(entry, "id") and entry.id:
-        return entry.id
-    return hashlib.sha1((entry.get("link") or entry.get("title") or "").encode()).hexdigest()
+def _post_id(slug: str) -> str:
+    return hashlib.sha1(slug.encode()).hexdigest()
 
 
-def _parse_date(entry) -> str:
-    for field in ("published_parsed", "updated_parsed"):
-        val = getattr(entry, field, None)
-        if val:
-            return datetime(*val[:6], tzinfo=timezone.utc).isoformat()
-    return datetime.now(timezone.utc).isoformat()
+def _extract_slugs(html: str) -> list[str]:
+    """Extrae slugs únicos de artículos /news/xxx del HTML."""
+    raw = re.findall(r'href=\"(/news/[a-zA-Z0-9\-]+)\"', html)
+    # Deduplicar manteniendo orden
+    seen = set()
+    result = []
+    for slug in raw:
+        if slug not in seen and slug != "/news":
+            seen.add(slug)
+            result.append(slug)
+    return result
+
+
+def _extract_title(html: str, slug: str) -> str:
+    """Intenta extraer el título del <title> o <h1> del artículo."""
+    m = re.search(r"<title[^>]*>([^<]+)</title>", html, re.IGNORECASE)
+    if m:
+        title = m.group(1).strip()
+        # Anthropic pone "Título | Anthropic" — quedarse con la parte antes del pipe
+        return title.split("|")[0].strip()
+    m = re.search(r"<h1[^>]*>([^<]+)</h1>", html, re.IGNORECASE)
+    if m:
+        return m.group(1).strip()
+    # Fallback: convertir slug a título
+    return slug.replace("/news/", "").replace("-", " ").title()
+
+
+def _extract_description(html: str) -> str:
+    """Extrae meta description del artículo."""
+    m = re.search(
+        r'<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']+)["\']',
+        html, re.IGNORECASE
+    )
+    if m:
+        return m.group(1).strip()
+    m = re.search(
+        r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+name=["\']description["\']',
+        html, re.IGNORECASE
+    )
+    if m:
+        return m.group(1).strip()
+    return ""
 
 
 async def check_anthropic_blog() -> int:
-    """Revisa el blog de Anthropic, guarda y notifica posts nuevos. Retorna cantidad de nuevos."""
-    logger.info("[anthropic] Revisando blog...")
+    """Revisa la página de noticias de Anthropic y notifica posts nuevos."""
+    logger.info("[anthropic] Revisando anthropic.com/news...")
+
     try:
-        feed = feedparser.parse(RSS_URL)
-        if feed.bozo and not feed.entries:
-            logger.warning("[anthropic] RSS falló, sin entradas.")
-            return 0
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+            r = await client.get(NEWS_URL, headers=HEADERS)
+            if r.status_code != 200:
+                logger.warning("[anthropic] HTTP %s en /news", r.status_code)
+                return 0
+            slugs = _extract_slugs(r.text)
     except Exception as e:
-        logger.error("[anthropic] Error parseando RSS: %s", e)
+        logger.error("[anthropic] Error fetching /news: %s", e)
         return 0
 
+    logger.info("[anthropic] %d artículos encontrados en /news", len(slugs))
+
     new_count = 0
-    for entry in feed.entries:
-        post_id = _post_id(entry)
-        if blog_post_exists(post_id):
-            continue
+    async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+        for slug in slugs[:15]:  # Máx 15 por ciclo
+            post_id = _post_id(slug)
+            if blog_post_exists(post_id):
+                continue
 
-        title = entry.get("title", "Sin título")
-        url = entry.get("link", "")
-        published_at = _parse_date(entry)
+            url = f"{BASE_URL}{slug}"
+            try:
+                r = await client.get(url, headers=HEADERS)
+                article_html = r.text if r.status_code == 200 else ""
+            except Exception:
+                article_html = ""
 
-        logger.info("[anthropic] Post nuevo: %s", title)
+            title = _extract_title(article_html, slug) if article_html else slug.replace("/news/", "").replace("-", " ").title()
+            rss_summary = _extract_description(article_html) if article_html else ""
+            published_at = datetime.now(timezone.utc).isoformat()
 
-        # Usar summary del RSS directamente (gratis, sin API)
-        rss_summary = entry.get("summary", "") or entry.get("description", "") or ""
-        summary = await summarize_blog_post(title=title, url=url, rss_summary=rss_summary)
+            logger.info("[anthropic] Post nuevo: %s", title)
 
-        save_blog_post(
-            post_id=post_id,
-            title=title,
-            url=url,
-            summary=summary,
-            published_at=published_at,
-            source="anthropic",
-            notified=True,
-        )
+            summary = await summarize_blog_post(
+                title=title, url=url, rss_summary=rss_summary
+            )
 
-        await send_blog_notification(title=title, url=url, summary=summary)
-        new_count += 1
+            save_blog_post(
+                post_id=post_id,
+                title=title,
+                url=url,
+                summary=summary,
+                published_at=published_at,
+                source="anthropic",
+                notified=True,
+            )
+
+            await send_blog_notification(title=title, url=url, summary=summary)
+            new_count += 1
 
     logger.info("[anthropic] %d posts nuevos procesados", new_count)
     return new_count
