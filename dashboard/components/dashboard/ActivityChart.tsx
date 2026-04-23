@@ -10,7 +10,6 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import type { ActivityPoint } from "@/lib/types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 function formatDate(dateStr: string) {
   const [, month, day] = dateStr.split("-");
@@ -20,25 +19,28 @@ function formatDate(dateStr: string) {
 export function ActivityChart({ data }: { data: ActivityPoint[] }) {
   if (data.length === 0) {
     return (
-      <Card className="bg-card border-border">
-        <CardHeader>
-          <CardTitle className="text-sm font-medium text-muted-foreground">Actividad — últimos 30 días</CardTitle>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center h-40">
-          <p className="text-muted-foreground text-sm">Sin datos aún</p>
-        </CardContent>
-      </Card>
+      <div className="rounded-xl border border-border bg-card p-5">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
+          Repos descubiertos — últimos 30 días
+        </p>
+        <div className="flex items-center justify-center h-48 border border-dashed border-border/50 rounded-lg">
+          <div className="text-center">
+            <p className="text-3xl font-bold mono text-muted-foreground/20">0</p>
+            <p className="text-xs text-muted-foreground/40 mt-1">
+              El bot corre diariamente a las 23:00 ART
+            </p>
+          </div>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card className="bg-card border-border">
-      <CardHeader>
-        <CardTitle className="text-sm font-medium text-muted-foreground">
-          Repos descubiertos — últimos 30 días
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+    <div className="rounded-xl border border-border bg-card p-5">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
+        Repos descubiertos — últimos 30 días
+      </p>
+      <div>
         <ResponsiveContainer width="100%" height={200}>
           <AreaChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
             <defs>
@@ -78,7 +80,7 @@ export function ActivityChart({ data }: { data: ActivityPoint[] }) {
             />
           </AreaChart>
         </ResponsiveContainer>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

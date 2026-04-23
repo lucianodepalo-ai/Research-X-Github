@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { getReportDays, getReposByReportDate } from "@/lib/queries";
 import { ScoreBadge } from "@/components/shared/ScoreBadge";
 import Link from "next/link";

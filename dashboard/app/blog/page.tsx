@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { getBlogPosts } from "@/lib/queries";
 import { ExternalLink } from "lucide-react";
 

@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { getTwitterFeed, getTrackedAccounts, getTwitterStats } from "@/lib/queries";
 import { ScoreBadge } from "@/components/shared/ScoreBadge";
 import { ExternalLink } from "lucide-react";

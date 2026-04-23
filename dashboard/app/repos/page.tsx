@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { Suspense } from "react";
 import { getRepos, getLanguages, getStats, getCategories } from "@/lib/queries";
 import type { RepoFilters } from "@/lib/types";
