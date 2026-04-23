@@ -57,8 +57,9 @@ async def check_anthropic_blog() -> int:
 
         logger.info("[anthropic] Post nuevo: %s", title)
 
-        # Resumir con Claude Haiku
-        summary = await summarize_blog_post(title=title, url=url)
+        # Usar summary del RSS directamente (gratis, sin API)
+        rss_summary = entry.get("summary", "") or entry.get("description", "") or ""
+        summary = await summarize_blog_post(title=title, url=url, rss_summary=rss_summary)
 
         save_blog_post(
             post_id=post_id,

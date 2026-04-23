@@ -84,7 +84,7 @@ async def main() -> None:
     logger.info("=== Research-X Monitor arrancando ===")
 
     # Verificar variables de entorno críticas
-    missing = [v for v in ("ANTHROPIC_API_KEY", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID") if not os.getenv(v)]
+    missing = [v for v in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID") if not os.getenv(v)]
     if missing:
         logger.error("Variables de entorno faltantes: %s", ", ".join(missing))
         logger.error("Revisá monitor/.env")
