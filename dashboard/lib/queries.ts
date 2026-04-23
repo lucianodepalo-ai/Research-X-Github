@@ -290,22 +290,33 @@ export function getTwitterStats(): { total: number; todayCount: number; accountC
 // ── Blog posts ────────────────────────────────────────────────────────────────
 
 export function getBlogPosts(
-  filters: { page?: number; pageSize?: number } = {}
+  filters: { source?: string; page?: number; pageSize?: number } = {}
 ): { posts: BlogPost[]; total: number } {
   const db = getDb();
-  const { page = 1, pageSize = 20 } = filters;
+  const { source, page = 1, pageSize = 50 } = filters;
 
-  const total = (db.prepare("SELECT COUNT(*) as c FROM blog_posts").get() as { c: number }).c;
+  const where = source ? "WHERE source = ?" : "";
+  const params: (string | number)[] = source ? [source] : [];
+
+  const total = (db.prepare(`SELECT COUNT(*) as c FROM blog_posts ${where}`).get(...params) as { c: number }).c;
   const offset = (page - 1) * pageSize;
   const posts = db
     .prepare(
-      `SELECT * FROM blog_posts
+      `SELECT * FROM blog_posts ${where}
        ORDER BY published_at DESC
        LIMIT ? OFFSET ?`
     )
-    .all(pageSize, offset) as BlogPost[];
+    .all(...params, pageSize, offset) as BlogPost[];
 
   return { posts, total };
+}
+
+export function getBlogSourceCounts(): Record<string, number> {
+  const db = getDb();
+  const rows = db
+    .prepare("SELECT source, COUNT(*) as c FROM blog_posts GROUP BY source")
+    .all() as { source: string; c: number }[];
+  return Object.fromEntries(rows.map((r) => [r.source, r.c]));
 }
 
 // ── Monitor events (live view) ────────────────────────────────────────────────

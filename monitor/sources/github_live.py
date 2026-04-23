@@ -17,24 +17,21 @@ logger = logging.getLogger(__name__)
 GITHUB_API = "https://api.github.com/search/repositories"
 
 # Tier 1 exclusivamente — señal alta, poco ruido, justifica búsqueda frecuente
+# Sin filtro de fecha — deduplicación en DB evita duplicados
+# Ordenado por stars DESC para capturar repos relevantes y nuevos primero
 LIVE_QUERIES = [
-    ("claude-code",              3,  2),   # (término, stars_min, days)
-    ("mcp-server",               3,  2),
-    ("claude agent",             5,  3),
-    ("model-context-protocol",   3,  2),
-    ("anthropic sdk",            5,  3),
-    ("claude desktop extension", 3,  5),
-    ("computer-use anthropic",   3,  5),
-    ("claude hooks",             3,  7),
-    ("claude skills",            3,  7),
-    ("mcp claude",               3,  3),
+    # (término, stars_min)
+    ("claude-code",              3),
+    ("mcp-server",               3),
+    ("claude agent",             5),
+    ("model-context-protocol",   3),
+    ("anthropic sdk",            5),
+    ("claude desktop extension", 3),
+    ("computer-use anthropic",   3),
+    ("claude hooks",             3),
+    ("claude skills",            3),
+    ("mcp claude",               3),
 ]
-
-
-def _iso_days_ago(days: int) -> str:
-    from datetime import timedelta
-    d = datetime.now(timezone.utc) - timedelta(days=days)
-    return d.strftime("%Y-%m-%d")
 
 
 def _get_headers() -> dict:
@@ -78,21 +75,22 @@ def _upsert_repo(db_conn, repo: dict) -> bool:
 
 async def check_github_live() -> int:
     """
-    Busca repos nuevos en GitHub con queries Tier 1.
-    Los guarda en seen_repos sin análisis.
-    Retorna cantidad de repos nuevos descubiertos.
+    Busca repos en GitHub con queries Tier 1.
+    Sin filtro de fecha — la DB deduplica. Retorna repos nuevos descubiertos.
+    Sin GITHUB_TOKEN: 10 req/min (suficiente para ciclos de 2h).
     """
     from monitor.state.db import conn as get_conn
+    import asyncio
     db = get_conn()
 
     headers = _get_headers()
+    has_token = bool(os.getenv("GITHUB_TOKEN", ""))
     new_count = 0
-    log_event("github_live", "Iniciando búsqueda live de GitHub", "info")
+    log_event("github_live", f"Iniciando búsqueda GitHub {'(autenticado)' if has_token else '(sin token)'}", "info")
 
     async with httpx.AsyncClient(timeout=15, headers=headers) as client:
-        for term, stars_min, days in LIVE_QUERIES:
-            since = _iso_days_ago(days)
-            q = f"{term} stars:>{stars_min} (created:>{since} OR pushed:>{since})"
+        for i, (term, stars_min) in enumerate(LIVE_QUERIES):
+            q = f"{term} stars:>{stars_min} sort:updated"
 
             try:
                 r = await client.get(
@@ -102,9 +100,8 @@ async def check_github_live() -> int:
 
                 if r.status_code == 403:
                     remaining = r.headers.get("x-ratelimit-remaining", "?")
-                    reset = r.headers.get("x-ratelimit-reset", "?")
-                    log_event("github_live", f"Rate limit alcanzado (remaining={remaining})", "warn")
-                    logger.warning("[github_live] Rate limit: %s", r.text[:100])
+                    log_event("github_live", f"Rate limit alcanzado (remaining={remaining}) — agregá GITHUB_TOKEN al .env", "warn")
+                    logger.warning("[github_live] Rate limit alcanzado. Sin token: 10 req/min. Con token: 5000 req/h")
                     break
 
                 if r.status_code != 200:
@@ -118,14 +115,18 @@ async def check_github_live() -> int:
                         term_new += 1
                         new_count += 1
 
+                logger.info("[github_live] '%s': %d en API, %d nuevos", term, len(items), term_new)
                 if term_new > 0:
                     log_event(
                         "github_live",
                         f"'{term}': {term_new} repos nuevos",
-                        "info",
-                        f"{len(items)} encontrados, {term_new} nuevos",
+                        "success",
+                        f"{len(items)} encontrados en API",
                     )
-                    logger.info("[github_live] '%s': %d nuevos / %d encontrados", term, term_new, len(items))
+
+                # Rate limit: sin token = 10 req/min → delay entre queries
+                if not has_token and i < len(LIVE_QUERIES) - 1:
+                    await asyncio.sleep(6)
 
             except Exception as e:
                 logger.error("[github_live] Error en query '%s': %s", term, e)
@@ -133,7 +134,7 @@ async def check_github_live() -> int:
 
     log_event(
         "github_live",
-        f"Búsqueda completada: {new_count} repos nuevos descubiertos",
+        f"Búsqueda completada: {new_count} repos nuevos",
         "success" if new_count > 0 else "info",
     )
     logger.info("[github_live] %d repos nuevos en total", new_count)

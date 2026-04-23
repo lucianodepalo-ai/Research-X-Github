@@ -70,7 +70,8 @@ db.exec(`
     url          TEXT,
     summary      TEXT,
     published_at TEXT,
-    notified_at  TEXT
+    notified_at  TEXT,
+    score        INTEGER DEFAULT 0
   );
   CREATE TABLE IF NOT EXISTS tracked_accounts (
     handle          TEXT PRIMARY KEY,
@@ -80,6 +81,14 @@ db.exec(`
     last_checked_at TEXT
   );
 `);
+
+// Migration: add score to blog_posts if not present
+{
+  const hasBlogScore = db.prepare("PRAGMA table_info(blog_posts)").all().some(c => c.name === 'score');
+  if (!hasBlogScore) {
+    db.exec("ALTER TABLE blog_posts ADD COLUMN score INTEGER DEFAULT 0");
+  }
+}
 
 db.exec(`
   CREATE VIRTUAL TABLE IF NOT EXISTS repos_fts USING fts5(

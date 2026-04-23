@@ -11,7 +11,7 @@ import httpx
 
 from monitor.analyze.evaluator import summarize_blog_post
 from monitor.notify.telegram import send_blog_notification
-from monitor.state.db import blog_post_exists, save_blog_post
+from monitor.state.db import blog_post_exists, save_blog_post, log_event
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +70,7 @@ def _extract_description(html: str) -> str:
 
 async def check_anthropic_blog() -> int:
     """Revisa la página de noticias de Anthropic y notifica posts nuevos."""
+    log_event("anthropic", "Revisando anthropic.com/news", "info")
     logger.info("[anthropic] Revisando anthropic.com/news...")
 
     try:
@@ -117,10 +118,16 @@ async def check_anthropic_blog() -> int:
                 published_at=published_at,
                 source="anthropic",
                 notified=True,
+                score=10,
             )
 
             await send_blog_notification(title=title, url=url, summary=summary)
             new_count += 1
 
     logger.info("[anthropic] %d posts nuevos procesados", new_count)
+    log_event(
+        "anthropic",
+        f"{new_count} posts nuevos de Anthropic · {len(slugs)} artículos en /news",
+        "success" if new_count > 0 else "info",
+    )
     return new_count

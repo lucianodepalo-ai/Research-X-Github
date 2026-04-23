@@ -12,7 +12,7 @@ import feedparser
 
 from monitor.analyze.evaluator import has_keyword, _count_points, _pts_to_score
 from monitor.notify.telegram import _send
-from monitor.state.db import blog_post_exists, save_blog_post
+from monitor.state.db import blog_post_exists, save_blog_post, log_event
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +37,7 @@ def _strip_html(text: str) -> str:
 
 async def check_devto() -> int:
     """Revisa tags de Dev.to. Retorna cantidad de artículos nuevos."""
+    log_event("devto", "Revisando Dev.to RSS", "info")
     new_count = 0
     seen_urls: set[str] = set()
 
@@ -93,6 +94,7 @@ async def check_devto() -> int:
                     published_at=published_at,
                     source="devto",
                     notified=score >= 7,
+                    score=score,
                 )
 
                 if score >= 7:
@@ -102,6 +104,11 @@ async def check_devto() -> int:
                 new_count += 1
 
     logger.info("[devto] %d artículos nuevos procesados", new_count)
+    log_event(
+        "devto",
+        f"{new_count} artículos nuevos de Dev.to",
+        "success" if new_count > 0 else "info",
+    )
     return new_count
 
 

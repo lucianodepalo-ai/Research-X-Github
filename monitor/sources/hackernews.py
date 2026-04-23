@@ -9,7 +9,7 @@ import httpx
 
 from monitor.analyze.evaluator import has_keyword, _count_points, _pts_to_score
 from monitor.notify.telegram import _send
-from monitor.state.db import blog_post_exists, save_blog_post
+from monitor.state.db import blog_post_exists, save_blog_post, log_event
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +107,7 @@ async def _algolia_search(client: httpx.AsyncClient) -> list[dict]:
 
 async def check_hackernews() -> int:
     """Revisa HN vía Algolia (búsqueda precisa) + top stories. Retorna nuevos relevantes."""
+    log_event("hackernews", "Revisando Hacker News", "info")
     new_count = 0
 
     async with httpx.AsyncClient(timeout=12, headers=HEADERS) as client:
@@ -170,6 +171,7 @@ async def check_hackernews() -> int:
                 published_at=published_at,
                 source="hackernews",
                 notified=score >= 7,
+                score=score,
             )
 
             if score >= 7:
@@ -180,4 +182,9 @@ async def check_hackernews() -> int:
             new_count += 1
 
     logger.info("[hn] %d posts nuevos procesados", new_count)
+    log_event(
+        "hackernews",
+        f"{new_count} posts nuevos · {len(all_items)} relevantes procesados",
+        "success" if new_count > 0 else "info",
+    )
     return new_count

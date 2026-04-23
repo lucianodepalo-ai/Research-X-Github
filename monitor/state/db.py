@@ -137,14 +137,16 @@ def save_blog_post(
     published_at: str,
     source: str = "anthropic",
     notified: bool = False,
+    score: int = 0,
 ) -> None:
     conn().execute(
         """INSERT OR IGNORE INTO blog_posts
-           (id, source, title, url, summary, published_at, notified_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+           (id, source, title, url, summary, published_at, notified_at, score)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             post_id, source, title, url, summary, published_at,
             now_iso() if notified else None,
+            score,
         ),
     )
     conn().commit()
